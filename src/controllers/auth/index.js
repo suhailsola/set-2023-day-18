@@ -1,7 +1,6 @@
 import { async } from "regenerator-runtime";
 import query from "../../database";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import config from "../../config";
 
 export async function register(req, res) {
@@ -17,18 +16,15 @@ export async function register(req, res) {
   console.log(password);
   //   insert hashed password data into db
   await query(
-    "INSERT INTO users (email, username, password, is_admin) VALUES ($1, $2, $3, $4)",
+    "INSERT INTO users (email, username, password, isAdmin) VALUES ($1, $2, $3, $4)",
     [email, username, hashedPassword, isAdmin]
-  ).then(function (resDb) {
-    res
-      .status(200)
-      .json({ message: "A user created" })
-      .catch(function (errDb) {
-        res.status(500).json({ message: "Server error", error: errDb });
-      });
-  });
-
-  res.status(200).json({ data });
+  )
+    .then(function (resDb) {
+      res.status(200).json({ message: "A user created" });
+    })
+    .catch(function (errDb) {
+      res.status(500).json({ message: "Server error", error: errDb });
+    });
 }
 
 export async function login(req, res) {
@@ -47,22 +43,14 @@ export async function login(req, res) {
 
   // create function
 
-  const generateAccessToken = (userData) => {
-    return jwt.sign(userData, config.jwtSecretToken, { expiresIn: "1800s" });
-  };
-
   //   compare hashed password
   bcrypt.compare(password, user.password, (error, bcryptRes) => {
     if (bcryptRes) {
-      const token = generateAccessToken({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-      });
+      req.session.auth = user.id;
       const serverRes = {
         message: "Login Succesful",
         data: user,
-        jwt: token,
+        session: req.session,
       };
       res.status(200).json(serverRes);
     } else {
@@ -96,7 +84,6 @@ export async function update(req, res) {
     }
     paramIndex++;
   });
-
   columns.push("updated_at = CURRENT_TIMESTAMP");
 
   const queryStr = `UPDATE users SET ${columns.join(
@@ -113,4 +100,25 @@ function hashPassword(password) {
   const salt = bcrypt.genSaltSync(10);
   const hashedPassword = bcrypt.hashSync(password, salt);
   return hashedPassword;
+}
+
+// add new post
+export async function newPost(req, res) {
+  const userID = req.user;
+  const { title, body } = req.body;
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .replaceAll(" ", "-");
+
+  await query(
+    "INSERT INTO posts (author_id, title, body, slug) VALUES ($1,$2,$3, $4)",
+    [userID, title, body, slug]
+  )
+    .then(function (resDB) {
+      res.status(200).json({ message: "New post added" });
+    })
+    .catch(function (errDB) {
+      res.status(500).json({ message: " Server error", error: errDB });
+    });
 }
