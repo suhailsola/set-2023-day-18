@@ -9,6 +9,13 @@ const pool = new Pool({
   database,
   password,
   port,
+  ssl:
+    config.nodeEnv === "production"
+      ? {
+          require: true,
+          rejectUnauthorized: false,
+        }
+      : false,
 });
 
 async function query(text, params, callback) {
